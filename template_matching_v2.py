@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 import pickle
 import sys
+import math
 
 package_path = '/Users/kirsteenng/Desktop/UW/DATA 590/bat-detector-msds/scikit-maad'
 
@@ -88,28 +89,46 @@ def run_template_matching(PATH_AUDIO: Path, RESULT_DIR: Path, Sxx_audio: np.ndar
 
     return rois
 
-def run_multiple_template_matching(PATH_AUDIO: Path, RESULT_DIR:Path,peak_th: float, peak_distance: float, template_dict:dict):
+def run_multiple_template_matching(PATH_AUDIO: Path, RESULT_DIR:Path,peak_th: float, peak_distance: float, template_dict:dict, num_flim_cuts: int):
 
     # Load sound and initiate variables
     s, fs = sound.load(PATH_AUDIO)
     rois_df = pd.DataFrame() 
 
-    for index in enumerate(template_dict.keys()): #change to enumerate(template_dict.keys) and change index to template_name whwere apropriate
-        print('Running against template {}'.format(index[1]))
+    for index, template in enumerate(template_dict.keys()): #change to enumerate(template_dict.keys) and change index to template_name whwere apropriate
+        print('Running against template {}'.format(template))
+        curr_template = template_dict[template]
+        flims = curr_template[2]
+        # We add more cuts in flims, we cut over a total shift of 3kHz (+-1.5kHz)
+        for num_cut in range(num_flim_cuts+2):
+            total_shift = 3000
+            if num_cut == num_flim_cuts+1:
+                new_flims = flims
+            else:
+                shift = -total_shift/2+num_cut*(total_shift/num_flim_cuts)
+                new_flims = (math.floor(flims[0]+shift),math.ceil(flims[1]+shift))            
+            print(num_cut)
+            print("new flims:",new_flims)
+            # Compute spectrogram for target audio of the same width as template
+            Sxx_audio, tn, fn, ext = sound.spectrogram(s, fs, window, nperseg, noverlap,flims=new_flims)
+            #util.plot_spectrogram(Sxx_audio, extent=ext, db_range=60, gain=20, colorbar=False, figsize=(2.5,10))
+            #util.plot_spectrogram(curr_template[0], extent=ext, db_range=60, gain=20, colorbar=False, figsize=(2.5,10))
+            print(Sxx_audio.shape)
+            print(curr_template[0].shape)
+            print("target",ext)
+            if np.any(np.less(Sxx_audio.shape, curr_template[0].shape)):
+                continue
+            Sxx_audio = util.power2dB(Sxx_audio, db_range)
+            
+            
+            curr_df = run_template_matching(PATH_AUDIO,RESULT_DIR,Sxx_audio, tn, ext, fn, 
+                                            new_flims,
+                                            template=curr_template[0], 
+                                            template_name=template+str(new_flims), 
+                                            peak_th=peak_th,
+                                            peak_distance=peak_distance)
 
-        # Compute spectrogram for target audio of the same width as template
-        Sxx_audio, tn, fn, ext = sound.spectrogram(s, fs, window, nperseg, noverlap,flims[index[0]])
-        Sxx_audio = util.power2dB(Sxx_audio, db_range)
-        
-        curr_template = template_dict[index[1]]
-        curr_df = run_template_matching(PATH_AUDIO,RESULT_DIR,Sxx_audio, tn, ext, fn, 
-                                        flims[index[0]],
-                                        template=curr_template[0], 
-                                        template_name=index[1], 
-                                        peak_th=peak_th,
-                                        peak_distance=peak_distance)
-
-        rois_df = pd.concat([rois_df,curr_df], ignore_index=True)
+            rois_df = pd.concat([rois_df,curr_df], ignore_index=True)
     
     
     print('Matching template loop complete, saving combined dfs to {}.'.format(RESULT_DIR))
@@ -156,16 +175,16 @@ def match_rois(rois: pd.DataFrame, RESULT_DIR: Path, threshold: float, num_match
 # %%
 if __name__ == '__main__':
     #Set constants
-    HOME_PATH = Path('/Users/kirsteenng/Desktop/UW/DATA 590')
-    TEMPLATE_AUDIO_1 = HOME_PATH / 'sample_wav/20210910_030000_time2303_LFbuzz.wav'
-    TEMPLATE_AUDIO_2 = HOME_PATH / 'wav_annotation/2021_09_10_wav/20210910_033000.WAV'
-    TEMPLATE_AUDIO_3 = HOME_PATH / 'workflow/1_audio_wav/20210910_030000.WAV'
-    TEMPLATE_AUDIO_4 = HOME_PATH / 'wav_annotation/2021_10_16_wav/20211016_030000.WAV'
+    HOME_PATH = Path('/Users/ernestocediel/OneDrive - Universidad de los Andes/MSDS/DATA 590 Capstone I & II/ravenpro_test')
+    TEMPLATE_AUDIO_1 = HOME_PATH / 'buzz/20210910_030000_time2303_LFbuzz.wav'
+    TEMPLATE_AUDIO_2 = HOME_PATH / '20210910_033000.WAV'
+    TEMPLATE_AUDIO_3 = HOME_PATH / '20210910_030000.WAV'
+    TEMPLATE_AUDIO_4 = HOME_PATH / '20211016_030000.WAV'
 
-    AUDIO_PATH = HOME_PATH / 'workflow/2_clipped_audio_wav/20210910_030000/20210910_030000__0.00_1440.00.wav'
-    RESULT_PATH= HOME_PATH / 'workflow/4_feeding_buzz_detector' 
-    TEMPLATE_PATH = HOME_PATH/ 'workflow/audio_templates'
-    TEMPLATE_PICKLE_PATH = HOME_PATH/'workflow/audio_templates/template_dict.pickle'
+    AUDIO_PATH = HOME_PATH / 'clipped/20210910_030000__0.00_1440.00.wav'
+    RESULT_PATH= HOME_PATH / 'results' 
+    TEMPLATE_PATH = HOME_PATH/ 'templates'
+    TEMPLATE_PICKLE_PATH = HOME_PATH/'templates/template_dict.pickle'
 
     # Set spectrogram parameters
     tlims = { 'template_1':(9.762, 10.059),
@@ -213,14 +232,15 @@ if __name__ == '__main__':
         save_template_dict(template_dict, TEMPLATE_PATH)
 
 
-    file_list = list(Path('/Users/kirsteenng/Desktop/UW/DATA 590/workflow/2_clipped_audio_wav/20210910_030000').glob('*.wav'))
+    file_list = list(Path(HOME_PATH / '2_clipped_audio_wav').glob('*.wav'))
     total_df = pd.DataFrame()
     for indv_path in file_list:
         AUDIO_PATH = indv_path
         rois_df = run_multiple_template_matching(AUDIO_PATH,RESULT_PATH,
-                                                peak_distance=0.05,
                                                 peak_th=0.25,
-                                                template_dict=template_dict)
+                                                peak_distance=0.25,
+                                                template_dict=template_dict,
+                                                num_flim_cuts=5)
         match_df = match_rois(rois_df,RESULT_PATH, 0.25, 4, 0.15, 1)
 
         match_df['Starting point'] = indv_path.stem[22:]
