@@ -1,10 +1,19 @@
 import os
 import argparse
-#from batdetect2 import bat_detect.utils.detector_utils as du
+import sys
+from pathlib import Path
 
+package_path = '/Users/kirsteenng/Desktop/UW/DATA 590/bat-detector-msds/batdetect2'
 
+if package_path not in set(sys.path):
+    sys.path.append(package_path)
+    print('Adding path to sys path')
 
-import bat_detect.utils.detector_utils as du
+print(sys.path)
+
+from bat_detect.utils import detector_utils as du
+#from batdetect2.bat_detect.utils import detector_utils as du
+#import bat_detect.utils.detector_utils as du
 
 
 def main(args):

@@ -12,9 +12,17 @@ import os
 from pathlib import Path
 
 import numpy as np
+import sys
+package_path = '/Users/kirsteenng/Desktop/UW/DATA 590/bat-detector-msds/batdetect2'
 
-import batdetect2.bat_detect.utils.audio_utils as au
-import batdetect2.bat_detect.utils.wavfile as wavfile
+if package_path not in set(sys.path):
+    sys.path.append(package_path)
+    print('Adding path to sys path')
+
+print(sys.path)
+
+from bat_detect.utils import audio_utils as au
+from bat_detect.utils import wavfile as wavfile
 
 
 def parse_args():
