@@ -76,28 +76,28 @@ class BatCallDetector(DetectionInterface):
             out_df.drop(columns = ['class', 'class_prob', 'det_prob','individual'], inplace=True)
         return out_df
     
-    def _run_feedbuzz(self, audio_file) -> pd.DataFrame: # TODO: type annotations
-        """
-         Parameters:: 
-            audio_file: a path containing the post-processed wav file.
+    # def _run_feedbuzz(self, audio_file) -> pd.DataFrame:  TODO: type annotations
+    #     """
+    #      Parameters:: 
+    #         audio_file: a path containing the post-processed wav file.
 
-        Returns:: a pd.Dataframe containing the feeding buzz detections
-        """
-        out_df = gen_empty_df()
-        template_dict = fbh.load_templates(self.template_dict_path)
-        out_df = fbh.run_multiple_template_matching(
-                                            PATH_AUDIO=audio_file,
-                                            out_df=out_df,
-                                            peak_distance=self.peak_distance, #self.peak_distance is a tuple for some reason.
-                                            peak_th=self.peak_th,
-                                            template_dict=template_dict,
-                                            num_matches_threshold=self.num_matches_threshold, 
-                                            buzz_feed_range=self.buzz_feed_range, 
-                                            alpha=self.alpha)
+    #     Returns:: a pd.Dataframe containing the feeding buzz detections
+    #     """
+    #     out_df = gen_empty_df()
+    #     template_dict = fbh.load_templates(self.template_dict_path)
+        # out_df = fbh.run_multiple_template_matching(
+    #                                         PATH_AUDIO=audio_file,
+    #                                         out_df=out_df,
+    #                                         peak_distance=self.peak_distance, #self.peak_distance is a tuple for some reason.
+    #                                         peak_th=self.peak_th,
+    #                                         template_dict=template_dict,
+    #                                         num_matches_threshold=self.num_matches_threshold, 
+    #                                         buzz_feed_range=self.buzz_feed_range, 
+    #                                         alpha=self.alpha)
         
-        # A flag for end user to differentiate between feeding buzz and bat calls.
-        out_df['event'] = 'Feeding Buzz'
-        return out_df
+    #     # A flag for end user to differentiate between feeding buzz and bat calls.
+    #     out_df['event'] = 'Feeding Buzz'
+    #     return out_df
     
 
     def _removing_collision(self,curr_row:tuple, compare_df:pd.DataFrame): 
@@ -131,43 +131,43 @@ class BatCallDetector(DetectionInterface):
     
         
 
-    def _buzzfeed_fp_removal(self,bd_output:pd.DataFrame, fb_output:pd.DataFrame)-> pd.DataFrame:
-        """
-        Creates a loop for feeding buzz to remove false positive.
-        Parameters::
-            bd_output: pd.DataFrame
-                DataFrame containing bat calls true positive values, result from Bat Detect pipeline.
+    # def _buzzfeed_fp_removal(self,bd_output:pd.DataFrame, fb_output:pd.DataFrame)-> pd.DataFrame:
+    #     """
+    #     Creates a loop for feeding buzz to remove false positive.
+    #     Parameters::
+    #         bd_output: pd.DataFrame
+    #             DataFrame containing bat calls true positive values, result from Bat Detect pipeline.
 
-            fb_output: pd.DataFrame
-                DataFrame containing feeding buzz detections, result from Template Matching pipeline.
+    #         fb_output: pd.DataFrame
+    #             DataFrame containing feeding buzz detections, result from Template Matching pipeline.
 
-        Return: pd.DataFrame
-        """
-        collide = np.zeros(len(fb_output))
-        for curr in fb_output.itertuples():
-            collide[curr.Index] = self._removing_collision(curr,bd_output)
+    #     Return: pd.DataFrame
+    #     """
+    #     collide = np.zeros(len(fb_output))
+    #     for curr in fb_output.itertuples():
+    #         collide[curr.Index] = self._removing_collision(curr,bd_output)
         
-        fb_output['Collide'] = collide
-        fb_df_filtered = fb_output[fb_output['Collide']== 0] 
-        del fb_df_filtered['Collide']
+    #     fb_output['Collide'] = collide
+    #     fb_df_filtered = fb_output[fb_output['Collide']== 0] 
+    #     del fb_df_filtered['Collide']
         
-        return fb_df_filtered
+    #     return fb_df_filtered
     
-    def run(self, audio_file):
-        """
-        Creates a loop for feeding buzz to remove false positive.
-        Parameters::
-            bd_output: pd.DataFrame
-                DataFrame containing bat calls true positive values, result from Bat Detect pipeline.
+    # def run(self, audio_file):
+    #     """
+    #     Creates a loop for feeding buzz to remove false positive.
+    #     Parameters::
+    #         bd_output: pd.DataFrame
+    #             DataFrame containing bat calls true positive values, result from Bat Detect pipeline.
 
-            fb_output: pd.DataFrame
-                DataFrame containing feeding buzz detections, result from Template Matching pipeline.
+    #         fb_output: pd.DataFrame
+    #             DataFrame containing feeding buzz detections, result from Template Matching pipeline.
                 
-        Return: pd.DataFrame
-        """
-        bd_output = self._run_batdetect(audio_file)
-        fb_output = self._run_feedbuzz(audio_file)
-        fb_final_output = self._buzzfeed_fp_removal(bd_output, fb_output)
+    #     Return: pd.DataFrame
+    #     """
+    #     bd_output = self._run_batdetect(audio_file)
+    #     fb_output = self._run_feedbuzz(audio_file)
+    #     fb_final_output = self._buzzfeed_fp_removal(bd_output, fb_output)
 
-        return pd.concat([bd_output,fb_final_output])
+    #     return pd.concat([bd_output,fb_final_output])
     
