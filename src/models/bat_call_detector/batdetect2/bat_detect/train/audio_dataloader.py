@@ -4,9 +4,10 @@ import numpy as np
 import copy
 import librosa
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
 import torchaudio
+import soundfile as sf
 import os
-
 import sys
 sys.path.append(os.path.join('..', '..'))
 import bat_detect.utils.audio_utils as au
@@ -21,10 +22,14 @@ def generate_gt_heatmaps(spec_op_shape, sampling_rate, ann, params):
 
     # start and end times
     x_pos_start = au.time_to_x_coords(ann['start_times'], sampling_rate,
-                                      params['fft_win_length'], params['fft_overlap'])
+                                      params['fft_win_length'], 
+                                    #   win_length,
+                                      params['fft_overlap'])
     x_pos_start = (params['resize_factor']*x_pos_start).astype(np.int)
     x_pos_end   = au.time_to_x_coords(ann['end_times'], sampling_rate,
-                                      params['fft_win_length'], params['fft_overlap'])
+                                      params['fft_win_length'], 
+                                    #   win_length,
+                                      params['fft_overlap'])
     x_pos_end   = (params['resize_factor']*x_pos_end).astype(np.int)
 
     # location on y axis i.e. frequency
@@ -166,9 +171,12 @@ def echo_aug(audio, sampling_rate, params):
 def resample_aug(audio, sampling_rate, params):
     sampling_rate_old = sampling_rate
     sampling_rate = np.random.choice(params['aug_sampling_rates'])
-    audio = librosa.resample(audio, sampling_rate_old, sampling_rate, res_type='polyphase')
+    win_length = 512.0 / float(sampling_rate) #using nfft as 512
+    audio = librosa.resample(audio, orig_sr=sampling_rate_old, target_sr=sampling_rate, res_type='polyphase')
 
-    audio = au.pad_audio(audio, sampling_rate, params['fft_win_length'],
+    audio = au.pad_audio(audio, sampling_rate, 
+                        #  win_length,
+                         params['fft_win_length'],
                          params['fft_overlap'], params['resize_factor'],
                          params['spec_divide_factor'], params['spec_train_width'])
     duration = audio.shape[0] / float(sampling_rate)
@@ -177,7 +185,7 @@ def resample_aug(audio, sampling_rate, params):
 
 def resample_audio(num_samples, sampling_rate, audio2, sampling_rate2):
     if sampling_rate != sampling_rate2:
-        audio2 = librosa.resample(audio2, sampling_rate2, sampling_rate, res_type='polyphase')
+        audio2 = librosa.resample(audio2, orig_sr=sampling_rate2, target_sr=sampling_rate, res_type='polyphase')
         sampling_rate2 = sampling_rate
     if audio2.shape[0] < num_samples:
         audio2 = np.hstack((audio2, np.zeros((num_samples-audio2.shape[0]), dtype=audio2.dtype)))
@@ -263,7 +271,21 @@ class AudioLoader(torch.utils.data.Dataset):
 
         ann_cnt = [len(aa['annotation']) for aa in self.data_anns]
         self.max_num_anns = 2*np.max(ann_cnt) # x2 because we may be combining files during training
-
+        self.num_files = len(self.data_anns)
+        self.dataset_len = params['num_steps_per_epoch'] * params['batch_size']
+        self.audio_data = []
+        #Pre load all audio files 
+        for idx in range(len(self.data_anns)):
+            audio_file = self.data_anns[idx]['file_path']
+            samplerate = sf.SoundFile(audio_file).samplerate
+            print(f"For file {audio_file}, sampling rate is {samplerate}")
+            sampling_rate, audio_raw = au.load_audio_file(audio_file,
+                                                          self.data_anns[idx]['time_exp'],
+                                                        #   self.params['target_samp_rate'],
+                                                          samplerate, 
+                                                          self.params['scale_raw_audio'])
+            self.audio_data.append((sampling_rate, audio_raw))
+        
         print('\n')
         if dataset_name is not None:
             print('Dataset     : ' + dataset_name)
@@ -281,18 +303,16 @@ class AudioLoader(torch.utils.data.Dataset):
         if index == None:
             index = np.random.randint(0, len(self.data_anns))
 
-        audio_file = self.data_anns[index]['file_path']
-        sampling_rate, audio_raw = au.load_audio_file(audio_file, self.data_anns[index]['time_exp'],
-                                      self.params['target_samp_rate'], self.params['scale_raw_audio'])
-
+        file_index = index % self.num_files
+        sampling_rate, audio_raw = self.audio_data[file_index]
         # copy annotation
         ann = {}
-        ann['annotated']     = self.data_anns[index]['annotated']
-        ann['class_id_file'] = self.data_anns[index]['class_id_file']
+        ann['annotated']     = self.data_anns[file_index]['annotated']
+        ann['class_id_file'] = self.data_anns[file_index]['class_id_file']
         keys = ['start_times', 'end_times', 'high_freqs', 'low_freqs', 'class_ids', 'individual_ids']
         for kk in keys:
-            ann[kk] = self.data_anns[index][kk].copy()
-
+            ann[kk] = self.data_anns[file_index][kk].copy()
+        #print('Audio Raw before cropping: ', audio_raw.shape)
         # if train then grab a random crop
         if self.is_train:
             nfft = int(self.params['fft_win_length']*sampling_rate)
@@ -312,17 +332,21 @@ class AudioLoader(torch.utils.data.Dataset):
             op_spec_target_size = self.params['spec_train_width']
         else:
             op_spec_target_size = None
-        audio_raw = au.pad_audio(audio_raw, sampling_rate, self.params['fft_win_length'],
+        win_length = 512.0 / float(sampling_rate) # using nfft as 512
+        audio_raw = au.pad_audio(audio_raw, sampling_rate, 
+                                #  win_length,
+                                 self.params['fft_win_length'],
                                 self.params['fft_overlap'], self.params['resize_factor'],
                                 self.params['spec_divide_factor'], op_spec_target_size)
         duration = audio_raw.shape[0] / float(sampling_rate)
 
         # sort based on time
+        #print('Audio Raw Shape: ', audio_raw.shape)
         inds = np.argsort(ann['start_times'])
         for kk in ann.keys():
             if (kk != 'class_id_file') and (kk != 'annotated'):
                 ann[kk] = ann[kk][inds]
-
+        
         return audio_raw, sampling_rate, duration, ann
 
 
@@ -370,6 +394,15 @@ class AudioLoader(torch.utils.data.Dataset):
             if np.random.random() < self.params['aug_prob']:
                 spec = mask_freq_aug(spec, self.params)
 
+        if self.is_train:
+            fig = plt.figure(1, figsize=(spec.shape[1]/100, spec.shape[0]/100), dpi=100, frameon=False)
+            plt.ylabel('Freq - kHz')
+            plt.xlabel('Time - secs')
+            plt.title(ann['class_id_file'])
+            spec_name = self.params['op_im_dir'] + "/img_for_" + str(ann['class_id_file']) + ".png"
+            plt.savefig(spec_name)
+            # plt.show()
+
         outputs = {}
         outputs['spec'] = spec
         if self.return_spec_for_viz:
@@ -404,4 +437,6 @@ class AudioLoader(torch.utils.data.Dataset):
 
 
     def __len__(self):
+        if self.is_train:
+            return self.dataset_len
         return len(self.data_anns)

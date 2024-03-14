@@ -3,6 +3,7 @@ import torch.nn.functional as F
 import os
 import numpy as np
 import pandas as pd
+import soundfile as sf
 import json
 import sys
 
@@ -212,9 +213,11 @@ def process_file(audio_file, model, params, args, time_exp=None, top_n=5, return
     params['detection_threshold'] = args['detection_threshold']
 
     # load audio file
+    samplerate = sf.SoundFile(audio_file).samplerate
     sampling_rate, audio_full = au.load_audio_file(audio_file, time_exp,
-                                   params['target_samp_rate'], params['scale_raw_audio'])
-
+                                #    params['target_samp_rate'], 
+                                    samplerate,
+                                    params['scale_raw_audio'])
     # clipping maximum duration
     if max_duration is not False:
         max_duration = np.minimum(int(sampling_rate*max_duration), audio_full.shape[0])

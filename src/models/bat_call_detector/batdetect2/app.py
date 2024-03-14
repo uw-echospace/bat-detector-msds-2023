@@ -1,6 +1,7 @@
 import gradio as gr
 import os
 import matplotlib.pyplot as plt
+import soundfile as sf
 import pandas as pd
 import numpy as np
 
@@ -63,8 +64,11 @@ def make_prediction(file_name=None, detection_threshold=0.3):
 def generate_results_image(audio_file, anns): 
     
     # load audio
+    samplerate = sf.SoundFile(audio_file).samplerate
     sampling_rate, audio = au.load_audio_file(audio_file, args['time_expansion_factor'], 
-                           params['target_samp_rate'], params['scale_raw_audio'], max_duration=max_duration)
+                        #    params['target_samp_rate'], 
+                        samplerate,
+                        params['scale_raw_audio'], max_duration=max_duration)
     duration = audio.shape[0] / sampling_rate
         
     # generate spec

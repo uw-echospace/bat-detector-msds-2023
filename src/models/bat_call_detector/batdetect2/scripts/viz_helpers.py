@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import ndimage
+import soundfile as sf
 import os
 import sys
 sys.path.append(os.path.join('..'))
@@ -43,9 +44,12 @@ def load_data(anns, params, class_names, smooth_spec=False, norm_type='log', ext
     sampling_rates = []
     file_names = []
     for cur_file in anns:
+        samplerate = sf.SoundFile(cur_file['file_path']).samplerate
         sampling_rate, audio_orig = au.load_audio_file(cur_file['file_path'], cur_file['time_exp'],
-        params['target_samp_rate'], params['scale_raw_audio'])
-
+        # params['target_samp_rate'], 
+        samplerate,
+        params['scale_raw_audio'])
+        
         for ann in cur_file['annotation']:
             if ann['class'] not in params['classes_to_ignore'] and ann['class'] in class_names:
                 # clip out of bounds

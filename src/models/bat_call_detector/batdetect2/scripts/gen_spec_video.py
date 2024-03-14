@@ -12,6 +12,7 @@ from scipy.io import wavfile
 import os
 import shutil
 import matplotlib.pyplot as plt
+import soundfile as sf
 import numpy as np
 import argparse
 
@@ -73,7 +74,11 @@ if __name__ == "__main__":
     # load audio file
     print('\nProcessing: ' + os.path.basename(audio_file))
     print('\nOutput directory: ' + op_dir)
-    sampling_rate, audio = au.load_audio_file(audio_file, args['time_expansion_factor'], params['target_samp_rate'])
+    samplerate = sf.SoundFile(args_cmd['audio_file']).samplerate
+    
+    sampling_rate, audio = au.load_audio_file(audio_file, args['time_expansion_factor'], 
+                                            #   params['target_samp_rate'])
+                                              samplerate)
     audio = audio[int(sampling_rate*start_time):int(sampling_rate*start_time + sampling_rate*duration)]
     audio_orig = audio.copy()
     audio = au.pad_audio(audio, sampling_rate, params['fft_win_length'],

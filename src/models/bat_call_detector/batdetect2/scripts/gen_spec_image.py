@@ -12,6 +12,7 @@ import sys
 import os
 import argparse
 import matplotlib.pyplot as plt
+import soundfile as sf
 import json
 
 sys.path.append(os.path.join('..'))
@@ -77,8 +78,13 @@ if __name__ == "__main__":
     # load audio and crop
     print('\nProcessing: ' + os.path.basename(args_cmd['audio_file']))
     print('\nOutput directory: ' + args_cmd['op_dir'])
+    
+    samplerate = sf.SoundFile(args_cmd['audio_file']).samplerate
     sampling_rate, audio = au.load_audio_file(args_cmd['audio_file'], args_cmd['time_exp'],
-                                              params_bd['target_samp_rate'], params_bd['scale_raw_audio'])
+                                            #   params_bd['target_samp_rate'], 
+                                            samplerate,
+                                            params_bd['scale_raw_audio'])
+    
     st_samp = int(sampling_rate*args_cmd['start_time'])
     en_samp = int(sampling_rate*args_cmd['stop_time'])
     if en_samp > audio.shape[0]:
