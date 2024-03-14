@@ -4,10 +4,10 @@ import os
 import torch
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import CosineAnnealingLR
+from tqdm import tqdm
 import json
 import argparse
 import glob
-
 import sys
 sys.path.append(os.path.join('..', '..'))
 import bat_detect.train.train_model as tm
@@ -155,18 +155,18 @@ if __name__ == "__main__":
     test_plt_class = pu.LossPlotter(params['experiment'] + 'test_avg_prec.png', params['num_epochs']+1,
                                   params['class_names_short'], [0,1], params['class_names_short'], ['epoch', 'avg_prec'])
 
-    print("Testing without running train (on vanilla model)")
-    test_res, test_loss = tm.test(model, 0, test_loader, det_criterion, params)
-    
     # main train loop
-    for epoch in range(0, params['num_epochs']+1):
+    for epoch in tqdm(range(0, params['num_epochs']+1), total=params['num_epochs'], desc='Epoch Training'):
 
         train_loss = tm.train(model, epoch, train_loader, det_criterion, optimizer, scheduler, params)
         train_plt_ls.update_and_save(epoch, [train_loss['train_loss']])
 
+        print("train plot saved, now memory is: ", torch.cuda.mem_get_info())
+
         if epoch % params['num_eval_epochs'] == 0:
             # detection accuracy on test set
             test_res, test_loss = tm.test(model, epoch, test_loader, det_criterion, params)
+            print("After calculating metrics on test set, memory allocated is: ", torch.cuda.mem_get_info())
             test_plt_ls.update_and_save(epoch, [test_loss['test_loss']])
             test_plt.update_and_save(epoch, [test_res['avg_prec'], test_res['rec_at_x'],
                                              test_res['avg_prec_class'], test_res['file_acc'], test_res['top_class']['avg_prec']])

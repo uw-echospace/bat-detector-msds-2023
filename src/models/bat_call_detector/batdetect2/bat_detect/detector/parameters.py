@@ -26,13 +26,13 @@ def get_params(make_dirs=False, exps_dir='../../experiments/'):
     # spec parameters
     params['target_samp_rate'] = 256000        # resamples all audio so that it is at this rate
     params['fft_win_length'] = 512 / 256000.0  # in milliseconds, amount of time per stft time step
-    params['fft_overlap']    = 0.75            # stft window overlap
+    params['fft_overlap']    = 0.5            # stft window overlap
 
     params['max_freq'] = 120000       # in Hz, everything above this will be discarded
     params['min_freq'] = 10000        # in Hz, everything below this will be discarded
 
     params['resize_factor'] = 0.5     # resize so the spectrogram at the input of the network
-    params['spec_height'] = 256       # units are number of frequency bins (before resizing is performed)
+    params['spec_height'] = 256       # RS: CAN BE REDUCED units are number of frequency bins (before resizing is performed)
     params['spec_train_width'] = 512  # units are number of time steps (before resizing is performed)
     params['spec_divide_factor'] = 32 # spectrogram should be divisible by this amount in width and height
 
@@ -65,7 +65,7 @@ def get_params(make_dirs=False, exps_dir='../../experiments/'):
     params['train_loss'] = 'focal'         # mse or focal
     params['det_loss_weight'] = 1.0        # weight for the detection part of the loss
     params['size_loss_weight'] = 0.1       # weight for the bbox size loss
-    params['class_loss_weight'] = 0.0      # REDUCED TO PREVENT classification loss
+    params['class_loss_weight'] = 0.0      # RS: REDUCED TO PREVENT CLASSFN  weight for the classification loss
     params['individual_loss_weight'] = 0.0 # not used
     if params['individual_loss_weight'] == 0.0:
         params['emb_dim'] = 0              # number of dimensions used for individual id embedding
@@ -73,14 +73,14 @@ def get_params(make_dirs=False, exps_dir='../../experiments/'):
         params['emb_dim'] = 3
 
     # train params
-    params['lr'] = 0.02
+    params['lr'] = 0.001
     params['batch_size'] = 512
     params['num_workers'] = 8
-    params['num_epochs'] = 50
-    params['num_steps_per_epoch'] = 50 #1000
+    params['num_epochs'] = 200
+    params['num_steps_per_epoch'] = 100 #1000
     params['num_eval_epochs'] = 5  # run evaluation every X epochs
     params['device'] = 'cuda'
-    params['save_test_image_during_train'] = True
+    params['save_test_image_during_train'] = False
     params['save_test_image_after_train'] = True
 
     params['convert_to_genus'] = False

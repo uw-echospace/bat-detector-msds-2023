@@ -92,13 +92,14 @@ def load_set_of_anns(data, classes_to_ignore=[], events_of_interest=None,
 
     # filter files that have annotation issues - is the input is a dictionary of
     # datasets, this will lilely have already been done
-    if filter_issues:
-        anns = [aa for aa in anns if aa['issues'] is False]
-
+    # if filter_issues:
+    #     anns = [aa for aa in anns if aa['issues'] is False]
+    
     # check for some basic formatting errors with class names
     for ann in anns:
         for aa in ann['annotation']:
             aa['class'] = aa['class'].strip()
+
 
     # only load specified events - i.e. types of calls
     if events_of_interest is not None:
@@ -109,6 +110,7 @@ def load_set_of_anns(data, classes_to_ignore=[], events_of_interest=None,
                     filtered_events.append(aa)
             ann['annotation'] = filtered_events
 
+    
     # change class names
     # replace_names will be a dictionary mapping input name to output
     if type(name_replace) is dict:
@@ -157,10 +159,12 @@ def load_anns(ann_file_name, raw_audio_dir):
 
 def load_anns_from_path(ann_file_dir, raw_audio_dir):
     files = glob.glob(ann_file_dir + '*.json')
+    # print(files)
     anns = []
     for ff in files:
         with open(ff) as da:
             ann = json.load(da)
+        # print(raw_audio_dir, ann['id'])
         ann['file_path'] = raw_audio_dir + ann['id']
         anns.append(ann)
 

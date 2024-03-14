@@ -6,7 +6,6 @@ import librosa
 import torch.nn.functional as F
 import torchaudio
 import os
-
 import sys
 sys.path.append(os.path.join('..', '..'))
 import bat_detect.utils.audio_utils as au
@@ -263,7 +262,18 @@ class AudioLoader(torch.utils.data.Dataset):
 
         ann_cnt = [len(aa['annotation']) for aa in self.data_anns]
         self.max_num_anns = 2*np.max(ann_cnt) # x2 because we may be combining files during training
-
+        self.num_files = len(self.data_anns)
+        self.dataset_len = params['num_steps_per_epoch'] * params['batch_size']
+        self.audio_data = []
+        #Pre load all audio files 
+        for idx in range(len(self.data_anns)):
+            audio_file = self.data_anns[idx]['file_path']
+            sampling_rate, audio_raw = au.load_audio_file(audio_file,
+                                                          self.data_anns[idx]['time_exp'],
+                                                          self.params['target_samp_rate'], 
+                                                          self.params['scale_raw_audio'])
+            self.audio_data.append((sampling_rate, audio_raw))
+        
         print('\n')
         if dataset_name is not None:
             print('Dataset     : ' + dataset_name)
@@ -281,18 +291,16 @@ class AudioLoader(torch.utils.data.Dataset):
         if index == None:
             index = np.random.randint(0, len(self.data_anns))
 
-        audio_file = self.data_anns[index]['file_path']
-        sampling_rate, audio_raw = au.load_audio_file(audio_file, self.data_anns[index]['time_exp'],
-                                      self.params['target_samp_rate'], self.params['scale_raw_audio'])
-
+        file_index = index % self.num_files
+        sampling_rate, audio_raw = self.audio_data[file_index]
         # copy annotation
         ann = {}
-        ann['annotated']     = self.data_anns[index]['annotated']
-        ann['class_id_file'] = self.data_anns[index]['class_id_file']
+        ann['annotated']     = self.data_anns[file_index]['annotated']
+        ann['class_id_file'] = self.data_anns[file_index]['class_id_file']
         keys = ['start_times', 'end_times', 'high_freqs', 'low_freqs', 'class_ids', 'individual_ids']
         for kk in keys:
-            ann[kk] = self.data_anns[index][kk].copy()
-
+            ann[kk] = self.data_anns[file_index][kk].copy()
+        #print('Audio Raw before cropping: ', audio_raw.shape)
         # if train then grab a random crop
         if self.is_train:
             nfft = int(self.params['fft_win_length']*sampling_rate)
@@ -318,11 +326,11 @@ class AudioLoader(torch.utils.data.Dataset):
         duration = audio_raw.shape[0] / float(sampling_rate)
 
         # sort based on time
+        #print('Audio Raw Shape: ', audio_raw.shape)
         inds = np.argsort(ann['start_times'])
         for kk in ann.keys():
             if (kk != 'class_id_file') and (kk != 'annotated'):
                 ann[kk] = ann[kk][inds]
-
         return audio_raw, sampling_rate, duration, ann
 
 
@@ -404,4 +412,6 @@ class AudioLoader(torch.utils.data.Dataset):
 
 
     def __len__(self):
+        if self.is_train:
+            return self.dataset_len
         return len(self.data_anns)

@@ -312,6 +312,7 @@ def evaluate_predictions(gts, preds, class_names, detection_overlap, ignore_star
 
     # evaluate detection on its own i.e. ignoring class
     det_results = compute_pre_rec(gts, preds, 'detection', None, num_classes, detection_overlap, ignore_start_end)
+    print(det_results)
     top_class   = compute_pre_rec(gts, preds, 'top_class', None, num_classes, detection_overlap, ignore_start_end)
     det_results['top_class'] = top_class
 

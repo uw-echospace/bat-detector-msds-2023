@@ -3,7 +3,7 @@ from . import wavfile
 import warnings
 import torch
 import librosa
-
+from functools import cache
 
 def time_to_x_coords(time_in_file, sampling_rate, fft_win_length, fft_overlap):
     nfft = np.floor(fft_win_length*sampling_rate) # int() uses floor
@@ -64,7 +64,8 @@ def generate_spectrogram(audio, sampling_rate, params, return_spec_for_viz=False
     return spec, spec_for_viz
 
 
-def load_audio_file(audio_file, time_exp_fact, target_samp_rate, scale=False, max_duration=False):
+def load_audio_file(audio_file, time_exp_fact, target_samp_rate, scale=False, max_duration=False, start_time=0):
+    print('Loading Audio File into Cache: ', audio_file)
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', category=wavfile.WavFileWarning)
         #sampling_rate, audio_raw = wavfile.read(audio_file)
@@ -82,7 +83,8 @@ def load_audio_file(audio_file, time_exp_fact, target_samp_rate, scale=False, ma
     # clipping maximum duration
     if max_duration is not False:
         max_duration = np.minimum(int(sampling_rate*max_duration), audio_raw.shape[0])
-        audio_raw = audio_raw[:max_duration]
+        start_time = int(sampling_rate*start_time)
+        audio_raw = audio_raw[start_time:max_duration]
         
     # convert to float32 and scale
     audio_raw = audio_raw.astype(np.float32)

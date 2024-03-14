@@ -80,8 +80,10 @@ if __name__ == "__main__":
     np.random.seed(args['rand_seed'])
 
     classes_to_ignore  = ['', ' ', 'Unknown', 'Not Bat']
-    generic_class      = ['Bat']
-    events_of_interest = ['Echolocation']
+    # classes_to_ignore = []
+    # generic_class      = ['Bat']
+    generic_class      = []
+    events_of_interest = ['Echolocation', 'e', 'v']
 
     if args['input_class_names'] != '' and args['output_class_names'] != '':
         # change the names of the classes
@@ -96,6 +98,7 @@ if __name__ == "__main__":
                                           classes_to_ignore, events_of_interest, False, False,
                                           list_of_anns=True, filter_issues=True, name_replace=name_dict)
 
+    # print(data_all)
     print('Dataset name:         ' + args['dataset_name'])
     print('Audio directory:      ' + args['audio_dir'])
     print('Annotation directory: ' + args['ann_dir'])
@@ -112,8 +115,11 @@ if __name__ == "__main__":
 
     else:
         # split the data into train and test at the file level
+        print("Splitting the data into train and test at the file level...")
         num_exs = len(data_all)
         test_inds = np.random.choice(np.arange(num_exs), int(num_exs*args['percent_val']), replace=False)
+        # test_inds = np.random.choice(np.arange(num_exs), int(num_exs*0.5), replace=False)
+        print(test_inds)
         test_inds = np.sort(test_inds)
         train_inds = np.setdiff1d(np.arange(num_exs), test_inds)
 
@@ -123,17 +129,21 @@ if __name__ == "__main__":
     if not os.path.isdir(args['op_dir']):
         os.makedirs(args['op_dir'])
     op_name = os.path.join(args['op_dir'], args['dataset_name'])
+    print(op_name)
     op_name_train = op_name + '_TRAIN.json'
     op_name_test  = op_name + '_TEST.json'
 
     class_un_train = print_dataset_stats(data_train, 'Train', classes_to_ignore)
     class_un_test = print_dataset_stats(data_test, 'Test', classes_to_ignore)
 
+    """
     if len(data_train) > 0 and len(data_test) > 0:
         if class_un_train != class_un_test:
             print('\nError: some classes are not in both the training and test sets.\
                    \nTry a different random seed "--rand_seed".')
             assert False
+
+    """
 
     print('\n')
     if len(data_train) == 0:

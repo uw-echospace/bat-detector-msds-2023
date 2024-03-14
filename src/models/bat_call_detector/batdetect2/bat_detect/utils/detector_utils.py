@@ -197,7 +197,7 @@ def compute_spectrogram(audio, sampling_rate, params, return_np=False):
     return duration, spec, spec_np
 
 
-def process_file(audio_file, model, params, args, time_exp=None, top_n=5, return_raw_preds=False, max_duration=False):
+def process_file(audio_file, model, params, args, time_exp=None, top_n=5, return_raw_preds=False, max_duration=False, start_time=0):
 
     # store temporary results here
     predictions = []
@@ -218,7 +218,8 @@ def process_file(audio_file, model, params, args, time_exp=None, top_n=5, return
     # clipping maximum duration
     if max_duration is not False:
         max_duration = np.minimum(int(sampling_rate*max_duration), audio_full.shape[0])
-        audio_full = audio_full[:max_duration]
+        start_time = int(start_time*sampling_rate)
+        audio_full = audio_full[start_time:max_duration]
     
     duration_full = audio_full.shape[0] / float(sampling_rate)
 

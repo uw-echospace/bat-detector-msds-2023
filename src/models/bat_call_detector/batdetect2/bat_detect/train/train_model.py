@@ -59,7 +59,7 @@ def save_image(spec_viz, outputs, ind, inputs, params, op_file_name, plot_title)
     duration = inputs['duration'][ind].item()
 
     pu.plot_spec(spec_viz, sampling_rate, duration, gt, pred_nms[ind],
-                 params, plot_title, op_file_name, pred_hm, plot_boxes=True)
+                 params, plot_title, op_file_name, pred_hm, plot_boxes=True, fixed_aspect=False)
 
 
 def loss_fun(outputs, gt_det, gt_size, gt_class, det_criterion, params, class_inv_freq):
@@ -94,6 +94,7 @@ def train(model, epoch, data_loader, det_criterion, optimizer, scheduler, params
         gt_size  = inputs['y_2d_size'].to(params['device'])
         gt_class = inputs['y_2d_classes'].to(params['device'])
 
+        #print("TRAIN after loading inputs to GPU: ", torch.cuda.mem_get_info())
         optimizer.zero_grad()
         outputs = model(data)
 
@@ -103,6 +104,8 @@ def train(model, epoch, data_loader, det_criterion, optimizer, scheduler, params
         loss.backward()
         optimizer.step()
         scheduler.step()
+        
+        #print("TRAIN after calculating loss and backward prop: ", torch.cuda.mem_get_info())
 
         if batch_idx % 50 == 0 and batch_idx != 0:
             print('[{}/{}]\tLoss: {:.4f}'.format(
@@ -132,48 +135,43 @@ def test(model, epoch, data_loader, det_criterion, params):
             gt_size = inputs['y_2d_size'].to(params['device'])
             gt_class = inputs['y_2d_classes'].to(params['device'])
 
+
+            #print("TEST before getting model: (MB) ", torch.cuda.mem_get_info())
             outputs = model(data)
-
-            if params['device'] == 'cuda':
-                data = data.cpu()
-                gt_det = gt_det.cpu()
-                gt_size = gt_size.cpu()
-                gt_class = gt_class.cpu()
-                outputs = {k: v.cpu() for k, v in outputs.items()}
-
+            data = data.cpu()
+            gt_det = gt_det.cpu()
+            gt_size = gt_size.cpu()
+            gt_class = gt_class.cpu()
+            outputs = {k: v.cpu() for k, v in outputs.items()}
+            #input_devices = {k: v.device for k, v in inputs.items()} 
+            #output_devices = {k: v.device for k, v in outputs.items()}
+            #print(input_devices)
+            #print(output_devices)
             #assert inputs['spec'].device == 'cpu', f"Device of input: {inputs['spec'].device}"            # if the model needs a fixed sized intput run this
             # data = torch.cat(torch.split(data, int(params['spec_train_width']*params['resize_factor']), 3), 0)
             # outputs = model(data)
             # for kk in ['pred_det', 'pred_size', 'pred_class']:
             #     outputs[kk] = torch.cat([oo for oo in outputs[kk]], 2).unsqueeze(0)
 
-            if params['save_test_image_during_train'] and batch_idx == 1:
+            if params['save_test_image_during_train'] and batch_idx == 0:
                 # for visualization - save the first prediction
-                ind = 1
+                ind = 0
                 orig_index = inputs['file_id'][ind]
                 plot_title = data_loader.dataset.data_anns[orig_index]['id']
                 op_file_name = params['op_im_dir'] + str(orig_index.item()).zfill(4) + '_' + str(epoch).zfill(4) + '_pred.jpg'
                 save_image(data, outputs, ind, inputs, params, op_file_name, plot_title)
+
 
             loss = loss_fun(outputs, gt_det, gt_size, gt_class, det_criterion, params, class_inv_freq)
             test_loss.update(loss.item(), data.shape[0])
 
             # do NMS
             pred_nms, _ = pp.run_nms(outputs, params, inputs['sampling_rate'].float())
-            gt = parse_gt_data(inputs)
-
-            if epoch % params['num_eval_epochs'] == 0:
-                print(f"For file {int(inputs['file_id'])}")
-                print(f"GT Start Times: {gt[0]['start_times']}")
-                print("GT End Times: ", gt[0]['end_times'])
-        
-                print(f"Predicted Det_prob>{params['detection_threshold']}: {str(pred_nms[0]['det_probs'][pred_nms[0]['det_probs'] > params['detection_threshold']])}")
-                print("Predicted Start Times:", str(pred_nms[0]['start_times'][pred_nms[0]['det_probs'] > params['detection_threshold']]))
-                print("Predicted End Times:", str(pred_nms[0]['end_times'][pred_nms[0]['det_probs'] > params['detection_threshold']]))
-
             predictions.extend(pred_nms)
-            ground_truths.extend(gt)
-    
+
+
+            ground_truths.extend(parse_gt_data(inputs))
+    #print("TEST memory after inference: (MB) ", torch.cuda.mem_get_info())
     res_det = evl.evaluate_predictions(ground_truths, predictions, params['class_names'],
                                        params['detection_overlap'], params['ignore_start_end'])
 
@@ -192,9 +190,14 @@ def test(model, epoch, data_loader, det_criterion, params):
 
     res = {}
     res['test_loss'] = float(test_loss.avg)
-    
     torch.cuda.empty_cache()
-    
+    # import gc
+    # for obj in gc.get_objects():
+    #     try:
+    #         if torch.is_tensor(obj) or (hasattr(obj, 'data') and torch.is_tensor(obj.data)):
+    #             print(type(obj), obj.size(), obj.device)
+    #     except:
+    #         pass
     return res_det, res
 
 
